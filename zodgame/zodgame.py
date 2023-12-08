@@ -11,6 +11,15 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
 import requests
 
+def send_telegram_message(bot_token, chat_id, message):
+    url = f'https://api.telegram.org/bot{bot_token}/sendMessage?chat_id={chat_id}&text={message}'
+    response = requests.get(url)
+    print(response.status_code)
+    if response.status_code == 200:
+        print('Telegram消息推送成功！')
+    else:
+        print('Telegram消息推送失败！')
+
 def zodgame_checkin(driver, formhash):
     checkin_url = "https://zodgame.xyz/plugin.php?id=dsu_paulsign:sign&operation=qiandao&infloat=1&inajax=0"    
     checkin_query = """
@@ -156,9 +165,69 @@ def zodgame(cookie_string):
 
     driver.close()
     driver.quit()
-    
+
+def get_info(cookie_string,result_string):
+    sign_in_info_url = "https://zodgame.xyz/plugin.php?id=dsu_paulsign:sign"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+                      "Chrome/119.0.0.0 Safari/537.36",
+        "Cookie": cookie_string,
+        "Referer": "https://zodgame.xyz/plugin.php?id=dsu_paulsign:sign",
+        "Sec-Ch-Ua-Platform": "Windows",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Site": "same-origin"
+    }
+    response = requests.get(sign_in_info_url, headers=headers)
+    if "今天已经签到过了" in response.text:
+        # print("成功获取签到信息")
+        pattern = re.compile(   r'<p><font color=.*?><b>(.*?)</b></font> , 您累计已签到: <b>(\d+)</b> 天</p>'
+                                r'[\s\S]*?'
+                                r'<p>您本月已累计签到:<b>(\d+)</b> 天</p>'
+                                r'[\s\S]*?'
+                                r'<p>您上次签到时间:<font color=".*?">(.*?)</font> </p>'
+                                r'[\s\S]*?'
+                                r'<p>您目前获得的总奖励为:酱油 <font color=".*?"><b>(\d+)</b></font> 瓶 , 上次获得的奖励为:酱油 <font color=".*?"><b>(\d+)</b></font> 瓶.</p>'
+                                r'[\s\S]*?'
+                                r'<p>您目前的等级: <font color=".*?"><b>(.*?)</b></font> , Tips: 您只需再签到 <font color=".*?"><b>(\d+)</b></font> 天就可以提升到下一个等级: <font color=".*?"><b>(.*?)</b></font> .</p>',
+                                re.DOTALL)
+
+        matches = pattern.search(response.text)
+
+        if matches:
+            nickname = matches.group(1)
+            accumulated_days = matches.group(2)
+            monthly_days = matches.group(3)
+            last_sign_in_time = matches.group(4)
+            total_rewards = matches.group(5)
+            last_rewards = matches.group(6)
+            current_level = matches.group(7)
+            days_to_next_level = matches.group(8)
+            next_level = matches.group(9)
+
+            result_string = (   f"===ZODGAME签到信息===\n"
+                                f"昵称: {nickname}\n"
+                                f"累计签到天数: {accumulated_days}\n"
+                                f"本月签到天数: {monthly_days}\n"
+                                f"上次签到时间: {last_sign_in_time}\n"
+                                f"总奖励: {total_rewards}\n"
+                                f"上次奖励: {last_rewards}\n"
+                                f"当前等级: {current_level}\n"
+                                f"距离下一等级还需签到天数: {days_to_next_level}\n"
+                                f"下一等级: {next_level}"
+                            )
+            # print(result_string)
+        else:
+            result_string = "未找到匹配的信息"
+            print("未找到匹配的信息")
+
 if __name__ == "__main__":
+    TG_BOT_TOKEN = os.environ["TG_BOT_TOKEN"]
+    TG_CHAT_ID = os.environ["TG_CHAT_ID"]
+    # ZODGAME_COOKIE = os.environ["ZODGAME_COOKIE"]
     cookie_string = sys.argv[1]
+    result_string=""
     assert cookie_string
     
     zodgame(cookie_string)
+    get_info(cookie_string,result_string)
+    send_telegram_message(TG_BOT_TOKEN, TG_CHAT_ID, result_string)
