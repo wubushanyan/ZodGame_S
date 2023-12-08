@@ -19,7 +19,7 @@ jobs:
       run: |
         pip3 install -r ./zodgame/requirements.txt
     - name: Run 
-      env: |
+      env:
         TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
         TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         ZODGAME_COOKIE: ${{ secrets.ZODGAME_COOKIE }}
